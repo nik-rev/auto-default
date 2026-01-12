@@ -1,4 +1,4 @@
-use proc_macro::{Delimiter, Group, Ident, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
 #[proc_macro_attribute]
 pub fn autodefault(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -52,6 +52,82 @@ pub fn autodefault(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 let mut fields_stream = group.stream().into_iter().peekable();
 
+                loop {
+                    // This loop parses attributes on the field
+                    //
+                    // #[attr] #[attr] pub field: Type
+                    //                ^ after the attributes
+                    let tt_after_attributes = loop {
+                        match input.next() {
+                            // this is an attribute: #[attr]
+                            Some(TokenTree::Punct(hash)) if hash == '#' => {
+                                // #[attr]
+                                // ^
+                                fields.extend([hash]);
+                                // #[attr]
+                                //  ^^^^^^
+                                fields.extend(input.next());
+                            }
+                            Some(tt) => break tt,
+                            None => panic!("unexpected end of input"),
+                        }
+                    };
+
+                    // Field has visibility
+                    //
+                    // pub(in crate) field: Type
+                    // ^^^^^^^^^^^^^
+                    if let TokenTree::Ident(ref ident) = tt_after_attributes
+                        && ident.to_string() == "pub"
+                    {
+                        let kw_pub = tt_after_attributes;
+                        // pub(in crate)
+                        // ^^^
+                        fields.extend([kw_pub]);
+                        if let Some(TokenTree::Group(group)) = input.next() {
+                            // pub(in crate)
+                            //    ^^^^^^^^^^
+                            fields.extend([group]);
+                        }
+
+                        // pub(in crate) field: Type
+                        //               ^^^^^
+                        fields.extend(input.next());
+                    }
+                    // No visibility
+                    else {
+                        let field_ident = tt_after_attributes;
+                        // field: Type
+                        // ^^^^^
+                        fields.extend([field_ident]);
+                    };
+
+                    // field: Type
+                    //      ^
+                    fields.extend(input.next());
+
+                    // field: Type
+                    //        ^^^^
+                    loop {
+                        match input.next() {
+                            // Part of the type
+                            Some(tt) => fields.extend([tt]),
+                            // Reached end of input. No comma.
+                            //
+                            // struct {
+                            //     field: Type
+                            //                ^
+                            // }
+                            None => {
+                                fields.extend(default());
+                                break;
+                            }
+                        }
+                    }
+
+                    todo!()
+                }
+
                 let mut g = Group::new(Delimiter::Brace, fields);
                 g.set_span(g.span());
                 output.extend([g]);
@@ -64,4 +140,24 @@ pub fn autodefault(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     output
+}
+
+// = ::core::default::Default::default()
+fn default() -> [TokenTree; 14] {
+    [
+        TokenTree::Punct(Punct::new('=', Spacing::Alone)),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Ident(Ident::new("core", Span::call_site())),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Ident(Ident::new("default", Span::call_site())),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Ident(Ident::new("Default", Span::call_site())),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Ident(Ident::new("default", Span::call_site())),
+        TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+    ]
 }
