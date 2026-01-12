@@ -1,0 +1,5 @@
+error: no arguments expected
+ --> tests/compile_fail/arguments.rs:4:16
+  |
+4 | #[auto_default(arguments)]
+  |                ^^^^^^^^^
