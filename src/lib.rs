@@ -7,6 +7,9 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// Turns this:
 ///
 /// ```rust
+/// # #![feature(default_field_values)]
+/// # #![feature(const_trait_impl)]
+/// # #![feature(const_default)]
 /// #[auto_default]
 /// struct User {
 ///     age: u8,
@@ -18,6 +21,9 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// Into this:
 ///
 /// ```rust
+/// # #![feature(default_field_values)]
+/// # #![feature(const_trait_impl)]
+/// # #![feature(const_default)]
 /// struct User {
 ///     age: u8 = Default::default(),
 ///     is_admin: bool = false
@@ -68,14 +74,17 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
         panic!("expected a `struct`")
     };
 
+    // This loop parses generics, where clause, and fields of the struct
     loop {
         match input.next() {
             Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => {
                 let mut fields = TokenStream::new();
 
-                let mut fields_stream = group.stream().into_iter().peekable();
+                let mut input = group.stream().into_iter().peekable();
 
-                loop {
+                // This loop parses all fields. Each iteration parses
+                // a single field
+                'parse_field: loop {
                     // This loop parses attributes on the field
                     //
                     // #[attr] #[attr] pub field: Type
@@ -92,7 +101,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                                 fields.extend(input.next());
                             }
                             Some(tt) => break tt,
-                            None => panic!("unexpected end of input"),
+                            None => break 'parse_field,
                         }
                     };
 
@@ -100,7 +109,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                     //
                     // pub(in crate) field: Type
                     // ^^^^^^^^^^^^^
-                    if let TokenTree::Ident(ref ident) = tt_after_attributes
+                    let field_ident_span = if let TokenTree::Ident(ref ident) = tt_after_attributes
                         && ident.to_string() == "pub"
                     {
                         let kw_pub = tt_after_attributes;
@@ -112,43 +121,87 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                             //    ^^^^^^^^^^
                             fields.extend([group]);
                         }
+                        let field_ident = input.next().expect("field identifier");
+                        let span = field_ident.span();
 
                         // pub(in crate) field: Type
                         //               ^^^^^
-                        fields.extend(input.next());
+                        fields.extend([field_ident]);
+                        span
                     }
                     // No visibility
                     else {
                         let field_ident = tt_after_attributes;
+                        let span = field_ident.span();
                         // field: Type
                         // ^^^^^
                         fields.extend([field_ident]);
+                        span
                     };
 
                     // field: Type
                     //      ^
                     fields.extend(input.next());
 
-                    // field: Type
-                    //        ^^^^
+                    // Everything after the `:` in the field
+                    //
+                    // Involves:
+                    //
+                    // - Adding default value of `= Default::default()` if one is not present
+                    // - Continue to next iteration of the loop
                     loop {
-                        match input.next() {
-                            // Part of the type
-                            Some(tt) => fields.extend([tt]),
-                            // Reached end of input. No comma.
+                        match input.peek() {
+                            // This field has a custom default field value
                             //
-                            // struct {
+                            // field: Type = default
+                            //             ^
+                            Some(TokenTree::Punct(p)) if p.as_char() == '=' => loop {
+                                match input.next() {
+                                    Some(TokenTree::Punct(p)) if p == ',' => {
+                                        fields.extend([p]);
+                                        // Comma after field. Field is finished.
+                                        continue 'parse_field;
+                                    }
+                                    Some(tt) => fields.extend([tt]),
+                                    // End of input. Field is finished. This is the last field
+                                    None => break 'parse_field,
+                                }
+                            },
+                            // Reached end of field, has comma at the end, no custom default value
+                            //
+                            // field: Type,
+                            //            ^
+                            Some(TokenTree::Punct(p)) if p.as_char() == ',' => {
+                                // Insert default value before the comma
+                                //
+                                // field: Type = Default::default(),
+                                //             ^^^^^^^^^^^^^^^^^^^^
+                                fields.extend(default(field_ident_span));
+                                // field: Type = Default::default(),
+                                //                                 ^
+                                fields.extend(input.next());
+                                // Next iteration handles the next field
+                                continue 'parse_field;
+                            }
+                            // This token is part of the field's type
+                            //
+                            // field: some::Type
+                            //              ^^^^
+                            Some(_) => fields.extend(input.next()),
+                            // Reached end of input, and it has no comma.
+                            // This is the last field.
+                            //
+                            // struct Foo {
                             //     field: Type
                             //                ^
                             // }
                             None => {
-                                fields.extend(default());
-                                break;
+                                fields.extend(default(field_ident_span));
+                                // No more fields
+                                break 'parse_field;
                             }
                         }
                     }
-
-                    todo!()
                 }
 
                 let mut g = Group::new(Delimiter::Brace, fields);
@@ -166,7 +219,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 // = ::core::default::Default::default()
-fn default() -> [TokenTree; 14] {
+fn default(_span: Span) -> [TokenTree; 14] {
     [
         TokenTree::Punct(Punct::new('=', Spacing::Alone)),
         TokenTree::Punct(Punct::new(':', Spacing::Joint)),

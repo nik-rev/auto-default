@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "autodefault"
+name = "auto_default"
 version = "0.1.0"
