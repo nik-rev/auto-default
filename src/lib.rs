@@ -1,7 +1,28 @@
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
+/// Adds a default field value of `Default:default()` to fields that don't have one
+///
+/// Turns this:
+///
+/// ```rust
+/// #[auto_default]
+/// struct User {
+///     age: u8,
+///     is_admin: bool = false
+/// }
+/// ```
+///
+/// Into this:
+///
+/// ```rust
+/// #[auto_default]
+/// struct User {
+///     age: u8 = Default::default(),
+///     is_admin: bool = false
+/// }
+/// ```
 #[proc_macro_attribute]
-pub fn autodefault(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     if !args.is_empty() {
         panic!("No arguments expected")
     }
