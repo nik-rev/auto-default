@@ -1,3 +1,5 @@
+use std::iter::Peekable;
+
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 
 /// Adds a default field value of `Default::default()` to fields that don't have one
@@ -47,10 +49,80 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     // We collect all tokens into here and then return this
     let mut output = TokenStream::new();
 
-    // Parses attributes on the struct
+    parse_attributes(&mut input, &mut output);
+    parse_vis(&mut input, &mut output);
+
+    // pub(in crate) struct Foo
+    //               ^^^^^^
+    let item_kind = match input.next() {
+        Some(TokenTree::Ident(kw)) if kw.to_string() == "struct" => {
+            output.extend([kw]);
+            ItemKind::Struct
+        }
+        Some(TokenTree::Ident(kw)) if kw.to_string() == "enum" => {
+            output.extend([kw]);
+            ItemKind::Enum
+        }
+        tt => {
+            compile_errors.extend(create_compile_error!(tt, "expected a `struct`"));
+            return compile_errors;
+        }
+    };
+
+    // struct Foo
+    //        ^^^
+    let Some(TokenTree::Ident(item_ident)) = input.next() else {
+        unreachable!("`struct` keyword is always followed by an identifier")
+    };
+    let item_ident_span = item_ident.span();
+    output.extend([item_ident]);
+
+    // Generics
     //
-    // #[attr] #[attr] pub field: Type
-    //                ^ after the attributes
+    // struct Foo<Bar, Baz: Trait> where Baz: Quux { ... }
+    //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    let item_fields = loop {
+        match input.next() {
+            // Fields of the struct
+            Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => break group,
+            // This token is part of the generics of the struct
+            Some(tt) => output.extend([tt]),
+            // reached end of input
+            None => {
+                // note: if enum, this is unreachable because `enum Foo` is invalid (requires `{}`),
+                // whilst `struct Foo;` is completely valid
+                compile_errors.extend(CompileError::new(
+                    item_ident_span,
+                    "expected struct with named fields",
+                ));
+                return compile_errors;
+            }
+        }
+    };
+
+    match item_kind {
+        ItemKind::Struct => {
+            let output_fields = add_default_field_values(item_fields);
+            output.extend([output_fields]);
+        }
+        ItemKind::Enum => {
+            todo!()
+        }
+    }
+
+    output.extend(compile_errors);
+
+    output
+}
+
+type Input = Peekable<proc_macro::token_stream::IntoIter>;
+
+// Parses attributes
+//
+// #[attr] #[attr] pub field: Type
+// #[attr] #[attr] struct Foo
+// #[attr] #[attr] enum Foo
+fn parse_attributes(input: &mut Input, output: &mut TokenStream) {
     loop {
         if !matches!(input.peek(), Some(TokenTree::Punct(hash)) if *hash == '#') {
             break;
@@ -62,7 +134,9 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
         //  ^^^^^^
         output.extend(input.next());
     }
+}
 
+fn parse_vis(input: &mut Input, output: &mut TokenStream) {
     // Remove visibility if it is present
     //
     // pub(in crate) struct
@@ -82,48 +156,27 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
             output.extend(input.next());
         }
     };
+}
 
-    // pub(in crate) struct Foo
-    //               ^^^^^^
-    match input.next() {
-        Some(TokenTree::Ident(kw)) if kw.to_string() == "struct" => {
-            output.extend([kw]);
-        }
-        tt => {
-            compile_errors.extend(create_compile_error!(tt, "expected a `struct`"));
-            return compile_errors;
-        }
-    }
+#[derive(PartialEq)]
+enum ItemKind {
+    Struct,
+    Enum,
+}
 
-    // struct Foo
-    //        ^^^
-    let Some(TokenTree::Ident(struct_ident)) = input.next() else {
-        unreachable!("`struct` keyword is always followed by an identifier")
-    };
-    let struct_ident_span = struct_ident.span();
-    output.extend([struct_ident]);
-
-    // Generics
-    //
-    // struct Foo<Bar, Baz: Trait> where Baz: Quux { ... }
-    //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    let fields = loop {
-        match input.next() {
-            // Fields of the struct
-            Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => break group,
-            // This token is part of the generics of the struct
-            Some(tt) => output.extend([tt]),
-            // reached end of input
-            None => {
-                compile_errors.extend(CompileError::new(
-                    struct_ident_span,
-                    "expected struct with named fields",
-                ));
-                return compile_errors;
-            }
-        }
-    };
-
+/// `fields` is [`StructFields`] in the grammar.
+///
+/// It is the curly braces, and everything within, for a struct with named fields,
+/// or an enum variant with named fields.
+///
+/// These fields are transformed by adding `= Default::default()` to every
+/// field that doesn't already have a default value.
+///
+/// If a field is marked with `#[auto_default(skip)]`, no default value will be
+/// added
+///
+/// [`StructFields`]: https://doc.rust-lang.org/reference/items/structs.html#grammar-StructFields
+fn add_default_field_values(fields: Group) -> Group {
     // All the tokens corresponding to the struct's field, passed by the user
     // These tokens will eventually all be sent to `output_fields`,
     // plus a few extra for any `Default::default()` that we output
@@ -253,13 +306,9 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     }
-
     let mut g = Group::new(Delimiter::Brace, output_fields);
-    g.set_span(g.span());
-    output.extend([g]);
-    output.extend(compile_errors);
-
-    output
+    g.set_span(fields.span());
+    g
 }
 
 // = ::core::default::Default::default()
