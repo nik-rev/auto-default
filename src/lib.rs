@@ -15,7 +15,6 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// Into this:
 ///
 /// ```rust
-/// #[auto_default]
 /// struct User {
 ///     age: u8 = Default::default(),
 ///     is_admin: bool = false
