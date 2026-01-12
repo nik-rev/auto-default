@@ -1,6 +1,6 @@
 use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, TokenTree};
 
-/// Adds a default field value of `Default:default()` to fields that don't have one
+/// Adds a default field value of `Default::default()` to fields that don't have one
 ///
 /// # Example
 ///
