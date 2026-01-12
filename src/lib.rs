@@ -49,8 +49,8 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     // We collect all tokens into here and then return this
     let mut output = TokenStream::new();
 
-    parse_attributes(&mut input, &mut output);
-    parse_vis(&mut input, &mut output);
+    stream_attrs(&mut input, &mut output);
+    stream_vis(&mut input, &mut output);
 
     // pub(in crate) struct Foo
     //               ^^^^^^
@@ -64,18 +64,18 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
             ItemKind::Enum
         }
         tt => {
-            compile_errors.extend(create_compile_error!(tt, "expected a `struct`"));
+            compile_errors.extend(create_compile_error!(
+                tt,
+                "expected a `struct` or an `enum`"
+            ));
             return compile_errors;
         }
     };
 
     // struct Foo
     //        ^^^
-    let Some(TokenTree::Ident(item_ident)) = input.next() else {
-        unreachable!("`struct` keyword is always followed by an identifier")
-    };
-    let item_ident_span = item_ident.span();
-    output.extend([item_ident]);
+    let item_ident_span = stream_ident(&mut input, &mut output)
+        .expect("`struct` or `enum` keyword is always followed by an identifier");
 
     // Generics
     //
@@ -115,45 +115,54 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     output
 }
 
-type Input = Peekable<proc_macro::token_stream::IntoIter>;
+type Source = Peekable<proc_macro::token_stream::IntoIter>;
+type Sink = TokenStream;
+
+/// Streams the identifier from `input` into `output`, returning its span, if the identifier exists
+fn stream_ident(source: &mut Source, sink: &mut Sink) -> Option<Span> {
+    let ident = source.next()?;
+    let span = ident.span();
+    sink.extend([ident]);
+    Some(span)
+}
 
 // Parses attributes
 //
 // #[attr] #[attr] pub field: Type
 // #[attr] #[attr] struct Foo
 // #[attr] #[attr] enum Foo
-fn parse_attributes(input: &mut Input, output: &mut TokenStream) {
+fn stream_attrs(source: &mut Source, sink: &mut Sink) {
     loop {
-        if !matches!(input.peek(), Some(TokenTree::Punct(hash)) if *hash == '#') {
+        if !matches!(source.peek(), Some(TokenTree::Punct(hash)) if *hash == '#') {
             break;
         };
         // #[attr]
         // ^
-        output.extend(input.next());
+        sink.extend(source.next());
         // #[attr]
         //  ^^^^^^
-        output.extend(input.next());
+        sink.extend(source.next());
     }
 }
 
-fn parse_vis(input: &mut Input, output: &mut TokenStream) {
+fn stream_vis(source: &mut Source, sink: &mut Sink) {
     // Remove visibility if it is present
     //
     // pub(in crate) struct
     // ^^^^^^^^^^^^^
-    if let Some(TokenTree::Ident(vis)) = input.peek()
+    if let Some(TokenTree::Ident(vis)) = source.peek()
         && vis.to_string() == "pub"
     {
         // pub(in crate) struct
         // ^^^
-        output.extend(input.next());
+        sink.extend(source.next());
 
-        if let Some(TokenTree::Group(group)) = input.peek()
+        if let Some(TokenTree::Group(group)) = source.peek()
             && let Delimiter::Parenthesis = group.delimiter()
         {
             // pub(in crate) struct
             //    ^^^^^^^^^^
-            output.extend(input.next());
+            sink.extend(source.next());
         }
     };
 }
@@ -188,58 +197,11 @@ fn add_default_field_values(fields: Group) -> Group {
     // Parses all fields.
     // Each iteration parses a single field
     'parse_field: loop {
-        // Parses attributes on the field
-        //
-        // #[attr] #[attr] pub field: Type
-        //                ^ after the attributes
-        let tt_after_attributes = loop {
-            match input_fields.next() {
-                // this is an attribute: #[attr]
-                Some(TokenTree::Punct(hash)) if hash == '#' => {
-                    // #[attr]
-                    // ^
-                    output_fields.extend([hash]);
-                    // #[attr]
-                    //  ^^^^^^
-                    output_fields.extend(input_fields.next());
-                }
-                Some(tt) => break tt,
-                None => break 'parse_field,
-            }
-        };
-
-        // Field has visibility
-        //
-        // pub(in crate) field: Type
-        // ^^^^^^^^^^^^^
-        let field_ident_span = if let TokenTree::Ident(ref ident) = tt_after_attributes
-            && ident.to_string() == "pub"
-        {
-            let kw_pub = tt_after_attributes;
-            // pub(in crate)
-            // ^^^
-            output_fields.extend([kw_pub]);
-            if let Some(TokenTree::Group(group)) = input_fields.next() {
-                // pub(in crate)
-                //    ^^^^^^^^^^
-                output_fields.extend([group]);
-            }
-            let field_ident = input_fields.next().expect("field identifier");
-            let span = field_ident.span();
-
-            // pub(in crate) field: Type
-            //               ^^^^^
-            output_fields.extend([field_ident]);
-            span
-        }
-        // No visibility
-        else {
-            let field_ident = tt_after_attributes;
-            let span = field_ident.span();
-            // field: Type
-            // ^^^^^
-            output_fields.extend([field_ident]);
-            span
+        stream_attrs(&mut input_fields, &mut output_fields);
+        stream_vis(&mut input_fields, &mut output_fields);
+        let Some(field_ident_span) = stream_ident(&mut input_fields, &mut output_fields) else {
+            // No fields. e.g.: `struct Struct {}`
+            break;
         };
 
         // field: Type

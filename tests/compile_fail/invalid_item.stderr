@@ -28,7 +28,7 @@ error: no arguments expected
 9 | #[auto_default(arguments)]
   |                ^^^^^^^^^
 
-error: expected a `struct`
+error: expected a `struct` or an `enum`
   --> tests/compile_fail/invalid_item.rs:10:1
    |
 10 | trait Z {}
@@ -40,7 +40,7 @@ error: no arguments expected
 12 | #[auto_default(arguments)]
    |                ^^^^^^^^^
 
-error: expected a `struct`
+error: expected a `struct` or an `enum`
   --> tests/compile_fail/invalid_item.rs:13:1
    |
 13 | fn x() {}
@@ -52,7 +52,7 @@ error: no arguments expected
 15 | #[auto_default(arguments)]
    |                ^^^^^^^^^
 
-error: expected a `struct`
+error: expected a `struct` or an `enum`
   --> tests/compile_fail/invalid_item.rs:16:1
    |
 16 | macro_rules! x {
@@ -64,7 +64,7 @@ error: no arguments expected
 20 | #[auto_default(arguments)]
    |                ^^^^^^^^^
 
-error: expected a `struct`
+error: expected a `struct` or an `enum`
   --> tests/compile_fail/invalid_item.rs:21:1
    |
 21 | mod a {}
