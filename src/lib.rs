@@ -2,6 +2,8 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 
 /// Adds a default field value of `Default:default()` to fields that don't have one
 ///
+/// # Example
+///
 /// Turns this:
 ///
 /// ```rust
@@ -10,6 +12,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 ///     age: u8,
 ///     is_admin: bool = false
 /// }
+/// # use auto_default::auto_default;
 /// ```
 ///
 /// Into this:
