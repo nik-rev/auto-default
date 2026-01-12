@@ -119,6 +119,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                     struct_ident_span,
                     "expected struct with named fields",
                 ));
+                return compile_errors;
             }
         }
     };

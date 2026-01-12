@@ -1,0 +1,71 @@
+error: no arguments expected
+ --> tests/compile_fail/invalid_item.rs:3:16
+  |
+3 | #[auto_default(arguments)]
+  |                ^^^^^^^^^
+
+error: expected struct with named fields
+ --> tests/compile_fail/invalid_item.rs:4:8
+  |
+4 | struct X(u32);
+  |        ^
+
+error: no arguments expected
+ --> tests/compile_fail/invalid_item.rs:6:16
+  |
+6 | #[auto_default(arguments)]
+  |                ^^^^^^^^^
+
+error: expected struct with named fields
+ --> tests/compile_fail/invalid_item.rs:7:8
+  |
+7 | struct M;
+  |        ^
+
+error: no arguments expected
+ --> tests/compile_fail/invalid_item.rs:9:16
+  |
+9 | #[auto_default(arguments)]
+  |                ^^^^^^^^^
+
+error: expected a `struct`
+  --> tests/compile_fail/invalid_item.rs:10:1
+   |
+10 | trait Z {}
+   | ^^^^^
+
+error: no arguments expected
+  --> tests/compile_fail/invalid_item.rs:12:16
+   |
+12 | #[auto_default(arguments)]
+   |                ^^^^^^^^^
+
+error: expected a `struct`
+  --> tests/compile_fail/invalid_item.rs:13:1
+   |
+13 | fn x() {}
+   | ^^
+
+error: no arguments expected
+  --> tests/compile_fail/invalid_item.rs:15:16
+   |
+15 | #[auto_default(arguments)]
+   |                ^^^^^^^^^
+
+error: expected a `struct`
+  --> tests/compile_fail/invalid_item.rs:16:1
+   |
+16 | macro_rules! x {
+   | ^^^^^^^^^^^
+
+error: no arguments expected
+  --> tests/compile_fail/invalid_item.rs:20:16
+   |
+20 | #[auto_default(arguments)]
+   |                ^^^^^^^^^
+
+error: expected a `struct`
+  --> tests/compile_fail/invalid_item.rs:21:1
+   |
+21 | mod a {}
+   | ^^^
