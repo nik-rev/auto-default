@@ -1,6 +1,7 @@
 #![feature(default_field_values)]
 #![feature(const_trait_impl)]
 #![feature(const_default)]
+#![allow(unused)]
 
 use auto_default::auto_default;
 
