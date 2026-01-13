@@ -5,6 +5,7 @@ use auto_default::auto_default;
 
 // nested skip is allowed
 
+#[allow(unused)]
 #[auto_default]
 #[derive(PartialEq, Eq, Debug)]
 enum Z {
@@ -14,17 +15,4 @@ enum Z {
         field: (),
         not_skip: (),
     },
-}
-
-fn main() {
-    assert_eq!(
-        Z::A {
-            field: (),
-            not_skip: ()
-        },
-        Z::A {
-            field: (),
-            not_skip: ()
-        }
-    );
 }
