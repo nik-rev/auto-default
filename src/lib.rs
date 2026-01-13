@@ -52,7 +52,7 @@
 //! }
 //! ```
 //!
-//! ### After
+//! ### With `#[auto_default]`
 //!
 //! ```rust
 //! # #![feature(default_field_values)]

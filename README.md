@@ -53,7 +53,7 @@ pub struct Layout {
 }
 ```
 
-#### After
+#### With `#[auto_default]`
 
 ```rust
 #[auto_default]
