@@ -16,8 +16,8 @@ edit `lib.rs` instead, then re-run `cargo rdme` to re-generate this file
 ![msrv](https://img.shields.io/badge/msrv-nightly-blue?style=flat-square&logo=rust)
 [![github](https://img.shields.io/github/stars/nik-rev/auto-default)](https://github.com/nik-rev/auto-default)
 
-This crate provides an attribute macro `#[auto_default]`: it adds `= Default::default()`
-to every field that does not have a default value.
+This crate provides an attribute macro `#[auto_default]`, which adds a default field value of
+`Default::default()` to fields that do not have one.
 
 ```toml
 [dependencies]
