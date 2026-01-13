@@ -43,13 +43,13 @@ very common to want field defaults to be the value of their `Default` implementa
 #[derive(Default)]
 pub struct Layout {
     order: u32 = Default::default(),
-    location: Point<f32> = Default::default(),
-    size: Size<f32> = Default::default(),
-    content_size: Size<f32> = Default::default(),
-    scrollbar_size: Size<f32> = Default::default(),
-    border: Rect<f32> = Default::default(),
-    padding: Rect<f32> = Default::default(),
-    margin: Rect<f32> = Default::default(),
+    location: Point = Default::default(),
+    size: Size = Default::default(),
+    content_size: Size = Default::default(),
+    scrollbar_size: Size = Default::default(),
+    border: Rect = Default::default(),
+    padding: Rect = Default::default(),
+    margin: Rect = Default::default(),
 }
 ```
 
@@ -57,20 +57,22 @@ pub struct Layout {
 
 ```rust
 #[auto_default]
+#[derive(Default)]
 pub struct Layout {
     order: u32,
-    location: Point<f32>,
-    size: Size<f32>,
-    content_size: Size<f32>,
-    scrollbar_size: Size<f32>,
-    border: Rect<f32>,
-    padding: Rect<f32>,
-    margin: Rect<f32>,
+    location: Point,
+    size: Size,
+    content_size: Size,
+    scrollbar_size: Size,
+    border: Rect,
+    padding: Rect,
+    margin: Rect,
 }
 ```
 
 You can apply the [`#[auto_default]`](macro@auto_default) macro to `struct`s with named fields, or enums
 
-If any field has the `#[auto_default(skip)]` attribute, it will not have a default field value added
+If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
+will not be added
 
 <!-- cargo-rdme end -->

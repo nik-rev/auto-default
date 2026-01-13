@@ -1,0 +1,17 @@
+error: duplicate `#[auto_default(skip)]`
+  --> tests/compile_fail/two_skips.rs:11:20
+   |
+11 |     #[auto_default(skip)]
+   |                    ^^^^
+
+error: duplicate `#[auto_default(skip)]`
+  --> tests/compile_fail/two_skips.rs:19:24
+   |
+19 |         #[auto_default(skip)]
+   |                        ^^^^
+
+error: duplicate `#[auto_default(skip)]`
+  --> tests/compile_fail/two_skips.rs:23:20
+   |
+23 |     #[auto_default(skip)]
+   |                    ^^^^

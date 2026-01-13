@@ -1,0 +1,11 @@
+error: `#[auto_default(skip)]` is not allowed on container
+  --> tests/compile_fail/skip_container.rs:10:16
+   |
+10 | #[auto_default(skip)]
+   |                ^^^^
+
+error: `#[auto_default(skip)]` is not allowed on container
+  --> tests/compile_fail/skip_container.rs:16:16
+   |
+16 | #[auto_default(skip)]
+   |                ^^^^

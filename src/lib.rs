@@ -28,38 +28,62 @@
 //! ### Before
 //!
 //! ```rust
+//! # #![feature(default_field_values)]
+//! # #![feature(const_trait_impl)]
+//! # #![feature(const_default)]
+//! # #![feature(derive_const)]
+//! # use auto_default::auto_default;
+//! # #[derive_const(Default)]
+//! # struct Rect { value: f32 }
+//! # #[derive_const(Default)]
+//! # struct Size { value: f32 }
+//! # #[derive_const(Default)]
+//! # struct Point { value: f32 }
 //! #[derive(Default)]
 //! pub struct Layout {
 //!     order: u32 = Default::default(),
-//!     location: Point<f32> = Default::default(),
-//!     size: Size<f32> = Default::default(),
-//!     content_size: Size<f32> = Default::default(),
-//!     scrollbar_size: Size<f32> = Default::default(),
-//!     border: Rect<f32> = Default::default(),
-//!     padding: Rect<f32> = Default::default(),
-//!     margin: Rect<f32> = Default::default(),
+//!     location: Point = Default::default(),
+//!     size: Size = Default::default(),
+//!     content_size: Size = Default::default(),
+//!     scrollbar_size: Size = Default::default(),
+//!     border: Rect = Default::default(),
+//!     padding: Rect = Default::default(),
+//!     margin: Rect = Default::default(),
 //! }
 //! ```
 //!
 //! ### After
 //!
 //! ```rust
+//! # #![feature(default_field_values)]
+//! # #![feature(const_trait_impl)]
+//! # #![feature(const_default)]
+//! # #![feature(derive_const)]
+//! # use auto_default::auto_default;
+//! # #[derive_const(Default)]
+//! # struct Rect { value: f32 }
+//! # #[derive_const(Default)]
+//! # struct Size { value: f32 }
+//! # #[derive_const(Default)]
+//! # struct Point { value: f32 }
 //! #[auto_default]
+//! #[derive(Default)]
 //! pub struct Layout {
 //!     order: u32,
-//!     location: Point<f32>,
-//!     size: Size<f32>,
-//!     content_size: Size<f32>,
-//!     scrollbar_size: Size<f32>,
-//!     border: Rect<f32>,
-//!     padding: Rect<f32>,
-//!     margin: Rect<f32>,
+//!     location: Point,
+//!     size: Size,
+//!     content_size: Size,
+//!     scrollbar_size: Size,
+//!     border: Rect,
+//!     padding: Rect,
+//!     margin: Rect,
 //! }
 //! ```
 //!
 //! You can apply the [`#[auto_default]`](macro@auto_default) macro to `struct`s with named fields, or enums
 //!
-//! If any field has the `#[auto_default(skip)]` attribute, it will not have a default field value added
+//! If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
+//! will not be added
 use std::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
@@ -143,7 +167,14 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     // We collect all tokens into here and then return this
     let mut sink = TokenStream::new();
 
-    stream_attrs(&mut source, &mut sink);
+    stream_attrs(
+        &mut source,
+        &mut sink,
+        &mut compile_errors,
+        // no skip allowed on the container, would make no sense
+        // (just don't use the `#[auto_default]` at all at that point!)
+        IsSkipAllowed(false),
+    );
     stream_vis(&mut source, &mut sink);
 
     // pub(in crate) struct Foo
@@ -196,16 +227,60 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 
     match item_kind {
         ItemKind::Struct => {
-            sink.extend([add_default_field_values(source_item_fields)]);
+            sink.extend([add_default_field_values(
+                source_item_fields,
+                &mut compile_errors,
+                // none of the fields are considered to be skipped initially
+                IsSkip(false),
+            )]);
         }
         ItemKind::Enum => {
             let mut source_variants = source_item_fields.stream().into_iter().peekable();
             let mut sink_variants = TokenStream::new();
 
             loop {
-                stream_attrs(&mut source_variants, &mut sink_variants);
+                // if this variant is marked #[auto_default(skip)]
+                let is_skip = stream_attrs(
+                    &mut source_variants,
+                    &mut sink_variants,
+                    &mut compile_errors,
+                    // can skip the variant, which removes auto-default for all
+                    // fields
+                    IsSkipAllowed(true),
+                );
+
+                // variants technically can have visibility, at least on a syntactic level
+                //
+                // pub Variant {  }
+                // ^^^
                 stream_vis(&mut source_variants, &mut sink_variants);
-                let _ = stream_ident(&mut source_variants, &mut sink_variants);
+
+                // Variant {  }
+                // ^^^^^^^
+                let Some(variant_ident_span) =
+                    stream_ident(&mut source_variants, &mut sink_variants)
+                else {
+                    // that means we have an enum with no variants, e.g.:
+                    //
+                    // enum Never {}
+                    //
+                    // When we parse the variants, there won't be an identifier
+                    break;
+                };
+
+                // only variants with named fields can be marked `#[auto_default(skip)]`
+                let mut disallow_skip = || {
+                    if is_skip.0 {
+                        compile_errors.extend(CompileError::new(
+                            variant_ident_span,
+                            concat!(
+                                "`#[auto_default(skip)]` is",
+                                " only allowed on variants with named fields"
+                            ),
+                        ));
+                    }
+                };
+
                 match source_variants.peek() {
                     // Enum variant with named fields. Add default field values.
                     Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => {
@@ -213,7 +288,11 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                         else {
                             unreachable!()
                         };
-                        sink_variants.extend([add_default_field_values(named_variant_fields)]);
+                        sink_variants.extend([add_default_field_values(
+                            named_variant_fields,
+                            &mut compile_errors,
+                            is_skip,
+                        )]);
 
                         stream_enum_variant_discriminant_and_comma(
                             &mut source_variants,
@@ -224,6 +303,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                     Some(TokenTree::Group(group))
                         if group.delimiter() == Delimiter::Parenthesis =>
                     {
+                        disallow_skip();
                         let Some(TokenTree::Group(unnamed_variant_fields)) = source_variants.next()
                         else {
                             unreachable!()
@@ -240,13 +320,17 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                     Some(TokenTree::Punct(punct))
                         if punct.as_char() == ',' || punct.as_char() == '=' =>
                     {
+                        disallow_skip();
                         stream_enum_variant_discriminant_and_comma(
                             &mut source_variants,
                             &mut sink_variants,
                         );
                     }
                     // Unit variant, with no comma at the end. This is the last variant
-                    None => break,
+                    None => {
+                        disallow_skip();
+                        break;
+                    }
                     Some(_) => unreachable!(),
                 }
             }
@@ -261,6 +345,9 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 
     sink
 }
+
+struct IsSkip(bool);
+struct IsSkipAllowed(bool);
 
 /// Streams enum variant discriminant + comma at the end from `source` into `sink`
 ///
@@ -321,18 +408,155 @@ fn stream_ident(source: &mut Source, sink: &mut Sink) -> Option<Span> {
 // #[attr] #[attr] pub field: Type
 // #[attr] #[attr] struct Foo
 // #[attr] #[attr] enum Foo
-fn stream_attrs(source: &mut Source, sink: &mut Sink) {
-    loop {
+//
+// Returns `true` if `#[auto_default(skip)]` was encountered
+fn stream_attrs(
+    source: &mut Source,
+    sink: &mut Sink,
+    errors: &mut TokenStream,
+    is_skip_allowed: IsSkipAllowed,
+) -> IsSkip {
+    let mut is_skip = None;
+
+    let is_skip = loop {
         if !matches!(source.peek(), Some(TokenTree::Punct(hash)) if *hash == '#') {
-            break;
+            break is_skip;
         };
+
+        // #[some_attr]
+        // ^
+        let pound = source.next();
+
+        // #[some_attr]
+        //  ^^^^^^^^^^^
+        let Some(TokenTree::Group(attr)) = source.next() else {
+            unreachable!()
+        };
+
+        // #[some_attr = hello]
+        //   ^^^^^^^^^^^^^^^^^
+        let mut attr_tokens = attr.stream().into_iter().peekable();
+
+        // Check if this attribute is `#[auto_default(skip)]`
+        if let Some(skip_span) = is_skip_attribute(&mut attr_tokens, errors) {
+            if is_skip.is_some() {
+                // Disallow 2 attributes on a single field:
+                //
+                // #[auto_default(skip)]
+                // #[auto_default(skip)]
+                errors.extend(CompileError::new(
+                    skip_span,
+                    "duplicate `#[auto_default(skip)]`",
+                ));
+            } else {
+                is_skip = Some(skip_span);
+            }
+            continue;
+        }
+
         // #[attr]
         // ^
-        sink.extend(source.next());
+        sink.extend(pound);
+
+        // Re-construct the `[..]` for the attribute
+        //
         // #[attr]
         //  ^^^^^^
-        sink.extend(source.next());
+        let mut group = Group::new(attr.delimiter(), attr_tokens.collect());
+        group.set_span(attr.span());
+
+        // #[attr]
+        //  ^^^^^^
+        sink.extend([group]);
+    };
+
+    if let Some(skip_span) = is_skip
+        && !is_skip_allowed.0
+    {
+        errors.extend(CompileError::new(
+            skip_span,
+            "`#[auto_default(skip)]` is not allowed on container",
+        ));
     }
+
+    IsSkip(is_skip.is_some())
+}
+
+/// if `source` is exactly `auto_default(skip)`, returns `Some(span)`
+/// with `span` being the `Span` of the `skip` identifier
+fn is_skip_attribute(source: &mut Source, errors: &mut TokenStream) -> Option<Span> {
+    let Some(TokenTree::Ident(ident)) = source.peek() else {
+        return None;
+    };
+
+    if ident.to_string() != "auto_default" {
+        return None;
+    };
+
+    // #[auto_default(skip)]
+    //   ^^^^^^^^^^^^
+    let ident = source.next().unwrap();
+
+    // We know it is `#[auto_default ???]`, we need to validate that `???`
+    // is exactly `(skip)` now
+
+    // #[auto_default(skip)]
+    //   ^^^^^^^^^^^^
+    let auto_default_span = ident.span();
+
+    // #[auto_default(skip)]
+    //               ^^^^^^
+    let group = match source.next() {
+        Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis => group,
+        Some(tt) => {
+            errors.extend(CompileError::new(tt.span(), "expected `(skip)`"));
+            return None;
+        }
+        None => {
+            errors.extend(CompileError::new(
+                auto_default_span,
+                "expected `(skip)` after this",
+            ));
+            return None;
+        }
+    };
+
+    // #[auto_default(skip)]
+    //                ^^^^
+    let mut inside = group.stream().into_iter();
+
+    // #[auto_default(skip)]
+    //                ^^^^
+    let ident_skip = match inside.next() {
+        Some(TokenTree::Ident(ident)) => ident,
+        Some(tt) => {
+            errors.extend(CompileError::new(tt.span(), "expected `skip`"));
+            return None;
+        }
+        None => {
+            errors.extend(CompileError::new(
+                group.span(),
+                "expected `(skip)`, found `()`",
+            ));
+            return None;
+        }
+    };
+
+    if ident_skip.to_string() != "skip" {
+        errors.extend(CompileError::new(ident_skip.span(), "expected `skip`"));
+        return None;
+    }
+
+    // Validate that there's nothing after `skip`
+    //
+    // #[auto_default(skip    )]
+    //                    ^^^^
+    if let Some(tt) = inside.next() {
+        errors.extend(CompileError::new(tt.span(), "unexpected token"));
+        return None;
+    }
+
+    Some(ident_skip.span())
 }
 
 fn stream_vis(source: &mut Source, sink: &mut Sink) {
@@ -375,7 +599,11 @@ enum ItemKind {
 /// added
 ///
 /// [`StructFields`]: https://doc.rust-lang.org/reference/items/structs.html#grammar-StructFields
-fn add_default_field_values(fields: Group) -> Group {
+fn add_default_field_values(
+    fields: Group,
+    compile_errors: &mut TokenStream,
+    is_skip_variant: IsSkip,
+) -> Group {
     // All the tokens corresponding to the struct's field, passed by the user
     // These tokens will eventually all be sent to `output_fields`,
     // plus a few extra for any `Default::default()` that we output
@@ -387,7 +615,13 @@ fn add_default_field_values(fields: Group) -> Group {
     // Parses all fields.
     // Each iteration parses a single field
     'parse_field: loop {
-        stream_attrs(&mut input_fields, &mut output_fields);
+        let is_skip_field = stream_attrs(
+            &mut input_fields,
+            &mut output_fields,
+            compile_errors,
+            IsSkipAllowed(true),
+        );
+        let is_skip = is_skip_field.0 || is_skip_variant.0;
         stream_vis(&mut input_fields, &mut output_fields);
         let Some(field_ident_span) = stream_ident(&mut input_fields, &mut output_fields) else {
             // No fields. e.g.: `struct Struct {}`
@@ -431,7 +665,9 @@ fn add_default_field_values(fields: Group) -> Group {
                     //
                     // field: Type = Default::default(),
                     //             ^^^^^^^^^^^^^^^^^^^^
-                    output_fields.extend(default(field_ident_span));
+                    if !is_skip {
+                        output_fields.extend(default(field_ident_span));
+                    }
                     // field: Type = Default::default(),
                     //                                 ^
                     output_fields.extend(input_fields.next());
@@ -451,7 +687,9 @@ fn add_default_field_values(fields: Group) -> Group {
                 //                ^
                 // }
                 None => {
-                    output_fields.extend(default(field_ident_span));
+                    if !is_skip {
+                        output_fields.extend(default(field_ident_span));
+                    }
                     // No more fields
                     break 'parse_field;
                 }

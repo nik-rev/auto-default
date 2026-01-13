@@ -1,0 +1,11 @@
+error: `#[auto_default(skip)]` is only allowed on variants with named fields
+  --> tests/compile_fail/skip_wrong.rs:11:5
+   |
+11 |     Unit,
+   |     ^^^^
+
+error: `#[auto_default(skip)]` is only allowed on variants with named fields
+  --> tests/compile_fail/skip_wrong.rs:13:5
+   |
+13 |     Tuple(u32),
+   |     ^^^^^
