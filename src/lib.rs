@@ -44,23 +44,23 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Input supplied by the user. All tokens from here will
     // get sent back to `output`
-    let mut input = input.into_iter().peekable();
+    let mut source = input.into_iter().peekable();
 
     // We collect all tokens into here and then return this
-    let mut output = TokenStream::new();
+    let mut sink = TokenStream::new();
 
-    stream_attrs(&mut input, &mut output);
-    stream_vis(&mut input, &mut output);
+    stream_attrs(&mut source, &mut sink);
+    stream_vis(&mut source, &mut sink);
 
     // pub(in crate) struct Foo
     //               ^^^^^^
-    let item_kind = match input.next() {
+    let item_kind = match source.next() {
         Some(TokenTree::Ident(kw)) if kw.to_string() == "struct" => {
-            output.extend([kw]);
+            sink.extend([kw]);
             ItemKind::Struct
         }
         Some(TokenTree::Ident(kw)) if kw.to_string() == "enum" => {
-            output.extend([kw]);
+            sink.extend([kw]);
             ItemKind::Enum
         }
         tt => {
@@ -74,19 +74,19 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // struct Foo
     //        ^^^
-    let item_ident_span = stream_ident(&mut input, &mut output)
+    let item_ident_span = stream_ident(&mut source, &mut sink)
         .expect("`struct` or `enum` keyword is always followed by an identifier");
 
     // Generics
     //
     // struct Foo<Bar, Baz: Trait> where Baz: Quux { ... }
     //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    let item_fields = loop {
-        match input.next() {
+    let source_item_fields = loop {
+        match source.next() {
             // Fields of the struct
             Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => break group,
             // This token is part of the generics of the struct
-            Some(tt) => output.extend([tt]),
+            Some(tt) => sink.extend([tt]),
             // reached end of input
             None => {
                 // note: if enum, this is unreachable because `enum Foo` is invalid (requires `{}`),
@@ -102,17 +102,113 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 
     match item_kind {
         ItemKind::Struct => {
-            let output_fields = add_default_field_values(item_fields);
-            output.extend([output_fields]);
+            sink.extend([add_default_field_values(source_item_fields)]);
         }
         ItemKind::Enum => {
-            todo!()
+            let mut source_variants = source_item_fields.stream().into_iter().peekable();
+            let mut sink_variants = TokenStream::new();
+
+            loop {
+                stream_attrs(&mut source_variants, &mut sink_variants);
+                stream_vis(&mut source_variants, &mut sink_variants);
+                let _ = stream_ident(&mut source_variants, &mut sink_variants);
+                match source_variants.peek() {
+                    // Enum variant with named fields. Add default field values.
+                    Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => {
+                        let Some(TokenTree::Group(named_variant_fields)) = source_variants.next()
+                        else {
+                            unreachable!()
+                        };
+                        sink_variants.extend([add_default_field_values(named_variant_fields)]);
+
+                        stream_enum_variant_discriminant_and_comma(
+                            &mut source_variants,
+                            &mut sink_variants,
+                        );
+                    }
+                    // Enum variant with unnamed fields.
+                    Some(TokenTree::Group(group))
+                        if group.delimiter() == Delimiter::Parenthesis =>
+                    {
+                        let Some(TokenTree::Group(unnamed_variant_fields)) = source_variants.next()
+                        else {
+                            unreachable!()
+                        };
+                        sink_variants.extend([unnamed_variant_fields]);
+
+                        stream_enum_variant_discriminant_and_comma(
+                            &mut source_variants,
+                            &mut sink_variants,
+                        );
+                    }
+                    // This was a unit variant. Next variant may exist,
+                    // if it does it is parsed on next iteration
+                    Some(TokenTree::Punct(punct))
+                        if punct.as_char() == ',' || punct.as_char() == '=' =>
+                    {
+                        stream_enum_variant_discriminant_and_comma(
+                            &mut source_variants,
+                            &mut sink_variants,
+                        );
+                    }
+                    // Unit variant, with no comma at the end. This is the last variant
+                    None => break,
+                    Some(_) => unreachable!(),
+                }
+            }
+
+            let mut sink_variants = Group::new(source_item_fields.delimiter(), sink_variants);
+            sink_variants.set_span(source_item_fields.span());
+            sink.extend([sink_variants]);
         }
     }
 
-    output.extend(compile_errors);
+    sink.extend(compile_errors);
 
-    output
+    sink
+}
+
+/// Streams enum variant discriminant + comma at the end from `source` into `sink`
+///
+/// enum Example {
+///     Three,
+///          ^
+///     Two(u32) = 2,
+///             ^^^^^
+///     Four { hello: u32 } = 4,
+///                        ^^^^^
+/// }
+fn stream_enum_variant_discriminant_and_comma(source: &mut Source, sink: &mut Sink) {
+    match source.next() {
+        // No discriminant, there may be another variant after this
+        Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
+            sink.extend([punct]);
+        }
+        // No discriminant, this is the final enum variant
+        None => {}
+        // Enum variant has a discriminant
+        Some(TokenTree::Punct(punct)) if punct.as_char() == '=' => {
+            sink.extend([punct]);
+
+            // Stream discriminant expression from `source` into `sink`
+            loop {
+                match source.next() {
+                    // End of discriminant, there may be a variant after this
+                    Some(TokenTree::Punct(punct)) if punct.as_char() == ',' => {
+                        sink.extend([punct]);
+                        break;
+                    }
+                    // This token is part of the variant's expression
+                    Some(tt) => {
+                        sink.extend([tt]);
+                    }
+                    // End of discriminant, this is the last variant
+                    None => break,
+                }
+            }
+        }
+        Some(_) => unreachable!(),
+    }
 }
 
 type Source = Peekable<proc_macro::token_stream::IntoIter>;

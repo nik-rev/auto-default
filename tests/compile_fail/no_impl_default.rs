@@ -14,4 +14,9 @@ struct X {
     default: DoesNotImplDefault,
 }
 
+#[auto_default]
+enum Foo {
+    A { b: DoesNotImplDefault },
+}
+
 fn main() {}
