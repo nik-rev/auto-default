@@ -16,25 +16,28 @@ edit `lib.rs` instead, then re-run `cargo rdme` to re-generate this file
 ![msrv](https://img.shields.io/badge/msrv-nightly-blue?style=flat-square&logo=rust)
 [![github](https://img.shields.io/github/stars/nik-rev/auto-default)](https://github.com/nik-rev/auto-default)
 
+This crate provides an attribute macro `#[auto_default]`: it adds `= Default::default()`
+to every field that does not have a default value.
+
+```toml
+[dependencies]
+auto-default = "0.1"
+```
+
+Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.
+
+### Showcase
+
 Rust's [default field values](https://github.com/rust-lang/rust/issues/132162) allow
 the shorthand `Struct { field, .. }` instead of the lengthy `Struct { field, ..Default::default() }`
 
-For this syntax to work (`..` instead of `..Default::default()`),
+For `..` instead of `..Default::default()` to work,
 your `Struct` needs **all** fields to have a default value.
 
-This often means lots of `= Default::default()` boilerplate on every field, because it is
+This often means `= Default::default()` boilerplate on every field, because it is
 very common to want field defaults to be the value of their `Default` implementation
 
-This crate provides an attribute macro `#[auto_default]`, which adds `= Default::default()` to every
-field that does not have a default value.
-
-<table>
-<tr>
-<th>Before</th>
-<th>After</th>
-</tr>
-<tr>
-<td>
+#### Before
 
 ```rust
 #[derive(Default)]
@@ -50,8 +53,7 @@ pub struct Layout {
 }
 ```
 
-</td>
-<td>
+#### After
 
 ```rust
 #[auto_default]
@@ -67,15 +69,8 @@ pub struct Layout {
 }
 ```
 
-</td>
-</tr>
-</table>
+You can apply the [`#[auto_default]`](macro@auto_default) macro to `struct`s with named fields, or enums
 
-```toml
-[dependencies]
-auto-default = "0.1"
-```
-
-Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.
+If any field has the `#[auto_default(skip)]` attribute, it will not have a default field value added
 
 <!-- cargo-rdme end -->
