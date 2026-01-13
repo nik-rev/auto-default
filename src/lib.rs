@@ -1,3 +1,58 @@
+//! Rust's [default field values](https://github.com/rust-lang/rust/issues/132162) allow
+//! the shorthand `Struct { field, .. }` instead of the lengthy `Struct { field, ..Default::default() }`
+//!
+//! For this syntax to work (`..` instead of `..Default::default()`),
+//! your `Struct` needs **all** fields to have a default value.
+//!
+//! This often means lots of `= Default::default()` boilerplate on every field, because it is
+//! very common to want field defaults to be the value of their `Default` implementation
+//!
+//! This crate provides an attribute macro `#[auto_default]`, which adds `= Default::default()` to every
+//! field that does not have a default value.
+//!
+//! <table>
+//! <tr>
+//! <th>Before</th>
+//! <th>After</th>
+//! </tr>
+//! <tr>
+//! <td>
+//!
+//! ```rust
+//! #[derive(Default)]
+//! pub struct Layout {
+//!     order: u32 = Default::default(),
+//!     location: Point<f32> = Default::default(),
+//!     size: Size<f32> = Default::default(),
+//!     content_size: Size<f32> = Default::default(),
+//!     scrollbar_size: Size<f32> = Default::default(),
+//!     border: Rect<f32> = Default::default(),
+//!     padding: Rect<f32> = Default::default(),
+//!     margin: Rect<f32> = Default::default(),
+//! }
+//! ```
+//!
+//! </td>
+//! <td>
+//!
+//! ```rust
+//! #[auto_default]
+//! pub struct Layout {
+//!     order: u32,
+//!     location: Point<f32>,
+//!     size: Size<f32>,
+//!     content_size: Size<f32>,
+//!     scrollbar_size: Size<f32>,
+//!     border: Rect<f32>,
+//!     padding: Rect<f32>,
+//!     margin: Rect<f32>,
+//! }
+//! ```
+//!
+//! </td>
+//! </tr>
+//! </table>
+
 use std::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
