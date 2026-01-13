@@ -1,13 +1,17 @@
 [package]
-name = "auto_default"
+name = "auto-default"
+description = "Macro that adds a default field value of `Default::default()` to fields that don't have one"
+repository = "https://github.com/nik-rev/auto-default"
+authors = ["Nik Revenco <pm@nikrev.com>"]
 version = "0.1.0"
+license = "MIT OR Apache-2.0"
+keywords = ["macros", "default", "field", "values", "boilerplate"]
+categories = ["development-tools", "development-tools::procedural-macro-helpers", "no-std", "no-std::no-alloc", "rust-patterns"]
 edition = "2024"
 
 [lib]
 proc-macro = true
 
-[dependencies]
-rustversion = "1.0.22"
-
 [dev-dependencies]
 trybuild = { version = "1.0.114", features = ["diff"] }
+rustversion = "1.0.22"

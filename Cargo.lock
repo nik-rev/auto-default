@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "auto_default"
+name = "auto-default"
 version = "0.1.0"
 dependencies = [
  "rustversion",
