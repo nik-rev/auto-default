@@ -10,7 +10,7 @@ struct User {
 }
 ```
 
-The `#[auto_default(skip)]` attribute will do nothing:
+The `#[auto_default(skip)]` attribute will do nothing.
 
 # v0.1.0
 
