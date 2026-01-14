@@ -146,7 +146,7 @@ use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenSt
 /// # #![feature(const_default)]
 /// struct User {
 ///     age: u8,
-///     is_admin: bool = false
+///     is_admin: bool = Default::default()
 /// }
 /// ```
 #[proc_macro_attribute]
