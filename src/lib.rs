@@ -1,5 +1,5 @@
 //! [![crates.io](https://img.shields.io/crates/v/auto-default?style=flat-square&logo=rust)](https://crates.io/crates/auto-default)
-//! [![docs.rs](https://img.shields.io/badge/docs.rs-auto-default-blue?style=flat-square&logo=docs.rs)](https://docs.rs/auto-default)
+//! [![docs.rs](https://img.shields.io/docsrs/auto-default)](https://docs.rs/auto-default)
 //! ![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)
 //! ![msrv](https://img.shields.io/badge/msrv-nightly-blue?style=flat-square&logo=rust)
 //! [![github](https://img.shields.io/github/stars/nik-rev/auto-default)](https://github.com/nik-rev/auto-default)
