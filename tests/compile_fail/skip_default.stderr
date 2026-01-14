@@ -1,0 +1,6 @@
+error: this field is marked `#[auto_default(skip)]`, which does nothing since this field has a default value: `= ...`
+       the attribute `#[auto_default(skip)]` can be removed
+  --> tests/compile_fail/skip_default.rs:10:5
+   |
+10 |     a: () = (),
+   |     ^

@@ -644,18 +644,32 @@ fn add_default_field_values(
                 //
                 // field: Type = default
                 //             ^
-                Some(TokenTree::Punct(p)) if p.as_char() == '=' => loop {
-                    match input_fields.next() {
-                        Some(TokenTree::Punct(p)) if p == ',' => {
-                            output_fields.extend([p]);
-                            // Comma after field. Field is finished.
-                            continue 'parse_field;
-                        }
-                        Some(tt) => output_fields.extend([tt]),
-                        // End of input. Field is finished. This is the last field
-                        None => break 'parse_field,
+                Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
+                    if is_skip {
+                        compile_errors.extend(CompileError::new(
+                            field_ident_span,
+                            concat!(
+                                "this field is marked `#[auto_default(skip)]`,",
+                                " which does nothing since this field has a",
+                                " default value: `= ...`\n",
+                                "the attribute `#[auto_default(skip)]` can be removed"
+                            ),
+                        ));
                     }
-                },
+
+                    loop {
+                        match input_fields.next() {
+                            Some(TokenTree::Punct(p)) if p == ',' => {
+                                output_fields.extend([p]);
+                                // Comma after field. Field is finished.
+                                continue 'parse_field;
+                            }
+                            Some(tt) => output_fields.extend([tt]),
+                            // End of input. Field is finished. This is the last field
+                            None => break 'parse_field,
+                        }
+                    }
+                }
                 // Reached end of field, has comma at the end, no custom default value
                 //
                 // field: Type,
