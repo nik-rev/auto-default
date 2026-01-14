@@ -21,7 +21,7 @@ This crate provides an attribute macro `#[auto_default]`, which adds a default f
 
 ```toml
 [dependencies]
-auto-default = "0.1"
+auto-default = "0.2"
 ```
 
 Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.

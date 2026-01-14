@@ -9,7 +9,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! auto-default = "0.1"
+//! auto-default = "0.2"
 //! ```
 //!
 //! Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.
