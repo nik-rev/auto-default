@@ -23,7 +23,7 @@ enum Foo {
     B { skipped: () },
 }
 
-// each of these contructors have a `skipped` field that has no default field value.
+// each of these constructors have a `skipped` field that has no default field value.
 fn main() {
     X { .. };
     Foo::A { .. };
