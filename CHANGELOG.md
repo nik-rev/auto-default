@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.2.0]: https://github.com/nik-rev/auto-default/compare/v0.1.5...v0.2.0
 
+### Removed
+
 It is now an error to use `#[auto_default(skip)]` on a field that has a default value:
 
 ```rust
