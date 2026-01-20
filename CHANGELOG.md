@@ -50,7 +50,3 @@ The `#[auto_default(skip)]` attribute will do nothing.
 ## [v0.1.1] - 2026-01-13
 
 [v0.1.1]: https://github.com/nik-rev/auto-default/compare/v0.1.0...v0.1.1
-
-## [v0.1.0] - 2026-01-13
-
-[v0.1.0]: https://github.com/nik-rev/auto-default/releases/v0.1.0
