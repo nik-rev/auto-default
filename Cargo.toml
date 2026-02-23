@@ -15,3 +15,6 @@ proc-macro = true
 [dev-dependencies]
 trybuild = { version = "1.0.114", features = ["diff"] }
 rustversion = "1.0.22"
+
+[dependencies]
+nik-rev = "0.1.1"
