@@ -59,9 +59,9 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "nik-rev"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "500aa5f84999b0700cd6e4cca2cc99311a95a592f0c40d5ccfd766a0632583cb"
+checksum = "28bfaeac48b39262c350d21db0a31c5ce2b776832a897b26fc691a898f963736"
 
 [[package]]
 name = "proc-macro2"

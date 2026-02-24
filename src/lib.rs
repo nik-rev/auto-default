@@ -1,9 +1,9 @@
-#![doc = nik_rev::badges!(repo = "auto-default", msrv = "nightly")]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/GENERATED_BADGES"))]
 //!
 //! This crate provides an attribute macro `#[auto_default]`, which adds a default field value of
 //! `Default::default()` to fields that do not have one.
 //!
-#![doc = nik_rev::add_dependency!()]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/GENERATED_ADD_DEP"))]
 //!
 //! Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.
 //!
