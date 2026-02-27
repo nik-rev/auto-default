@@ -2,7 +2,7 @@
 #![doc = concat!("[![docs.rs](https://img.shields.io/docsrs/", env!("CARGO_PKG_NAME"), "?style=flat-square&logo=docs.rs)](https://docs.rs/", env!("CARGO_PKG_NAME"), ")")]
 #![doc = "![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)"]
 //! ![msrv](https://img.shields.io/badge/msrv-nightly-blue?style=flat-square&logo=rust)
-#![doc = concat!("[![github](https://img.shields.io/github/stars/nik-rev/", env!("CARGO_PKG_NAME"), ")](https://github.com/nik-rev/", env!("CARGO_PKG_NAME"), ")")]
+//! [![github](https://img.shields.io/github/stars/nik-rev/auto-default)](https://github.com/nik-rev/auto-default)
 //!
 //! This crate provides an attribute macro `#[auto_default]`, which adds a default field value of
 //! `Default::default()` to fields that do not have one.
