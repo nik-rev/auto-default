@@ -1,13 +1,19 @@
-#![doc = include_str!(concat!(env!("OUT_DIR"), "/GENERATED_BADGES"))]
+#![doc = concat!("[![crates.io](https://img.shields.io/crates/v/", env!("CARGO_PKG_NAME"), "?style=flat-square&logo=rust)](https://crates.io/crates/", env!("CARGO_PKG_NAME"), ")")]
+#![doc = concat!("[![docs.rs](https://img.shields.io/docsrs/", env!("CARGO_PKG_NAME"), "?style=flat-square&logo=docs.rs)](https://docs.rs/", env!("CARGO_PKG_NAME"), ")")]
+#![doc = "![license](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue?style=flat-square)"]
+//! ![msrv](https://img.shields.io/badge/msrv-nightly-blue?style=flat-square&logo=rust)
+#![doc = concat!("[![github](https://img.shields.io/github/stars/nik-rev/", env!("CARGO_PKG_NAME"), ")](https://github.com/nik-rev/", env!("CARGO_PKG_NAME"), ")")]
 //!
 //! This crate provides an attribute macro `#[auto_default]`, which adds a default field value of
 //! `Default::default()` to fields that do not have one.
 //!
-#![doc = include_str!(concat!(env!("OUT_DIR"), "/GENERATED_ADD_DEP"))]
+//! ```toml
+#![doc = concat!(env!("CARGO_PKG_NAME"), " = ", "\"", env!("CARGO_PKG_VERSION_MAJOR"), ".", env!("CARGO_PKG_VERSION_MINOR"), "\"")]
+//! ```
 //!
 //! Note: `auto-default` has *zero* dependencies. Not even `syn`! The compile times are very fast.
 //!
-//! ## Showcase
+//! # Showcase
 //!
 //! Rust's [default field values](https://github.com/rust-lang/rust/issues/132162) allow
 //! the shorthand `Struct { field, .. }` instead of the lengthy `Struct { field, ..Default::default() }`
@@ -18,7 +24,7 @@
 //! This often means `= Default::default()` boilerplate on every field, because it is
 //! very common to want field defaults to be the value of their `Default` implementation
 //!
-//! ### Before
+//! ## Before
 //!
 //! ```rust
 //! # #![feature(default_field_values)]
@@ -45,7 +51,7 @@
 //! }
 //! ```
 //!
-//! ### With `#[auto_default]`
+//! ## With `#[auto_default]`
 //!
 //! ```rust
 //! # #![feature(default_field_values)]
