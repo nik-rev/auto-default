@@ -166,6 +166,8 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     // We collect all tokens into here and then return this
     let mut sink = TokenStream::new();
 
+    // #[derive(Foo)]
+    // pub(in crate) struct Foo
     stream_attrs(
         &mut source,
         &mut sink,
@@ -174,6 +176,9 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
         // (just don't use the `#[auto_default]` at all at that point!)
         IsSkipAllowed(false),
     );
+
+    // pub(in crate) struct Foo
+    // ^^^^^^^^^^^^^
     stream_vis(&mut source, &mut sink);
 
     // pub(in crate) struct Foo
@@ -614,6 +619,8 @@ fn add_default_field_values(
     // Parses all fields.
     // Each iteration parses a single field
     'parse_field: loop {
+        // #[serde(rename = "x")] pub field: Type
+        // ^^^^^^^^^^^^^^^^^^^^^^
         let is_skip_field = stream_attrs(
             &mut input_fields,
             &mut output_fields,
@@ -621,7 +628,13 @@ fn add_default_field_values(
             IsSkipAllowed(true),
         );
         let is_skip = is_skip_field.0 || is_skip_variant.0;
+
+        // pub field: Type
+        // ^^^
         stream_vis(&mut input_fields, &mut output_fields);
+
+        // pub field: Type
+        //     ^^^^^
         let Some(field_ident_span) = stream_ident(&mut input_fields, &mut output_fields) else {
             // No fields. e.g.: `struct Struct {}`
             break;
@@ -673,7 +686,106 @@ fn add_default_field_values(
                 //
                 // field: Type,
                 //            ^
+                //
+                // OR, this comma is part of the field's type:
+                //
+                // field: HashMap<u8, u8>,
+                //                  ^
                 Some(TokenTree::Punct(p)) if p.as_char() == ',' => {
+                    let comma = input_fields.next().expect("match on `Some`");
+
+                    /// What does this comma represent?
+                    #[derive(Debug)]
+                    enum CommaStatus {
+                        /// End of field
+                        EndOfField0,
+                        /// End of field, with 2 tokens to insert after end of the field
+                        EndOfField1(TokenTree),
+                        /// Part of type
+                        PartOfType0,
+                        /// Part of type, with 1 token to insert after the comma
+                        PartOfType1(TokenTree),
+                    }
+
+                    // When we encounter a COMMA token while parsing
+                    let comma_status = match input_fields.peek() {
+                        // pub field: Type
+                        // ^^^
+                        Some(TokenTree::Ident(ident)) if ident.to_string() == "pub" => {
+                            // this `comma` is end of the field
+                            //
+                            //     field: HashMap<u8, u8>,
+                            //                           ^ `comma`
+                            // pub next_field: Type
+                            // ^^^ `ident`
+                            CommaStatus::EndOfField0
+                        }
+
+                        // #[foo(bar)] pub field: Type
+                        // ^
+                        Some(TokenTree::Punct(punct)) if *punct == '#' => {
+                            // this `comma` is end of the field
+                            //
+                            //             field: HashMap<u8, u8>,
+                            //                                   ^ this
+                            // #[foo(bar)] next_field: HashMap<u8, u8>,
+                            CommaStatus::EndOfField0
+                        }
+
+                        // field: Type
+                        // ^^^^^
+                        Some(TokenTree::Ident(_)) => {
+                            let field_or_ty_ident = input_fields.next().expect("match on `Some`");
+
+                            match input_fields.peek() {
+                                // field: Type
+                                //      ^
+                                Some(TokenTree::Punct(punct)) if *punct == ':' => {
+                                    let field_ident = field_or_ty_ident;
+
+                                    CommaStatus::EndOfField1(field_ident)
+                                }
+                                // This identifier is part of the type
+                                //
+                                // field: HashMap<u8, u8>,
+                                //                    ^^
+                                _ => {
+                                    let ty_ident = field_or_ty_ident;
+                                    CommaStatus::PartOfType1(ty_ident)
+                                }
+                            }
+                        }
+
+                        // This comma is part of a type, NOT end of field!
+                        //
+                        // pub field: HashMap<String, String>
+                        //                          ^
+                        Some(_) => CommaStatus::PartOfType0,
+
+                        // Reached end of input. This comma is end of the field
+                        //
+                        // field: Type,
+                        //            ^
+                        None => CommaStatus::EndOfField0,
+                    };
+
+                    let insert_extra_token = match comma_status {
+                        CommaStatus::EndOfField0 => None,
+                        CommaStatus::EndOfField1(token_tree) => Some(token_tree),
+                        CommaStatus::PartOfType0 => {
+                            output_fields.extend([comma]);
+                            continue;
+                        }
+                        CommaStatus::PartOfType1(token_tree) => {
+                            output_fields.extend([comma]);
+                            output_fields.extend([token_tree]);
+                            continue;
+                        }
+                    };
+
+                    // Now that we're here, we can be 100% sure that the `comma` we have
+                    // is at the END of the field
+
                     // Insert default value before the comma
                     //
                     // field: Type = Default::default(),
@@ -681,9 +793,18 @@ fn add_default_field_values(
                     if !is_skip {
                         output_fields.extend(default(field_ident_span));
                     }
+
                     // field: Type = Default::default(),
                     //                                 ^
-                    output_fields.extend(input_fields.next());
+                    output_fields.extend([comma]);
+
+                    if let Some(token_tree) = insert_extra_token {
+                        // Insert the extra token which we needed to take when figuring out if this
+                        // comma is part of the type, or end of the field
+
+                        output_fields.extend([token_tree]);
+                    }
+
                     // Next iteration handles the next field
                     continue 'parse_field;
                 }
