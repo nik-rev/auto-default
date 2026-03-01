@@ -9,7 +9,7 @@
 
     This region was generated from Rust documentation comments by `cargo-reedme` using this command:
 
-        cargo reedme
+        cargo +nightly reedme
 
     for more info: https://github.com/nik-rev/cargo-reedme
 
@@ -74,7 +74,7 @@ pub struct Layout {
 }
 ```
 
-You can apply the [`#[auto_default]`](https://docs.rs/auto-default/0.2.5/auto_default/attr.auto_default.html) macro to `struct`s with named fields, and `enum`s.
+You can apply the [`#[auto_default]`](https://docs.rs/auto-default/latest/auto_default/attr.auto_default.html) macro to `struct`s with named fields, and `enum`s.
 
 If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
 will **not** be added
