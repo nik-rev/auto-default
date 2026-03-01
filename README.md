@@ -74,7 +74,7 @@ pub struct Layout {
 }
 ```
 
-You can apply the [`#[auto_default]`](https://docs.rs/auto-default/0.2.4/auto_default/attr.auto_default.html) macro to `struct`s with named fields, and `enum`s.
+You can apply the [`#[auto_default]`](https://docs.rs/auto-default/0.2.5/auto_default/attr.auto_default.html) macro to `struct`s with named fields, and `enum`s.
 
 If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
 will **not** be added
