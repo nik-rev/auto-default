@@ -83,6 +83,15 @@
 //!
 //! If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
 //! will **not** be added
+//!
+//! # Global Import
+//!
+//! This will make `#[auto_default]` globally accessible in your entire crate, without needing to import it:
+//!
+//! ```
+//! #[macro_use(auto_default)]
+//! extern crate auto_default;
+//! ```
 use std::iter::Peekable;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
