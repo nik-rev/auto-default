@@ -13,11 +13,8 @@ struct X {
 
 #[test]
 fn test() {
-    assert_eq!(
-        X { .. },
-        X {
-            no_default: 0,
-            default: 10
-        }
-    );
+    assert_eq!(X { .. }, X {
+        no_default: 0,
+        default: 10
+    });
 }

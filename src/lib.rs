@@ -94,7 +94,15 @@
 //! ```
 use std::iter::Peekable;
 
-use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
+use proc_macro::Delimiter;
+use proc_macro::Group;
+use proc_macro::Ident;
+use proc_macro::Literal;
+use proc_macro::Punct;
+use proc_macro::Spacing;
+use proc_macro::Span;
+use proc_macro::TokenStream;
+use proc_macro::TokenTree;
 
 /// Adds a default field value of `Default::default()` to fields that don't have one
 ///

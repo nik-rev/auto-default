@@ -77,8 +77,8 @@ fn tuple_discriminant() {
 
 #[test]
 fn named_discriminant() {
-    assert_eq!(
-        NamedDiscriminant::Named { .. },
-        NamedDiscriminant::Named { a: 0, c: 40 }
-    );
+    assert_eq!(NamedDiscriminant::Named { .. }, NamedDiscriminant::Named {
+        a: 0,
+        c: 40
+    });
 }
