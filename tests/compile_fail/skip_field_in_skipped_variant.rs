@@ -3,10 +3,18 @@
 #![feature(const_default)]
 use auto_default::auto_default;
 
+// nested skip is not allowed
+
 #[allow(unused)]
 #[auto_default]
 #[derive(PartialEq, Eq, Debug)]
 enum Z {
     #[auto_default(skip)]
-    A { field: (), not_skip: () },
+    A {
+        #[auto_default(skip)]
+        field: (),
+        not_skip: (),
+    },
 }
+
+fn main() {}

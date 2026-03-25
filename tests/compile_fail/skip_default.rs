@@ -3,7 +3,8 @@
 #![feature(const_default)]
 use auto_default::auto_default;
 
-// invalid syntax of the skip attribute (#[auto_default(skip)])
+// invalid syntax of the skip attribute (#[auto_default(skip)]) on a field
+// with a default value
 #[auto_default]
 struct X {
     #[auto_default(skip)]

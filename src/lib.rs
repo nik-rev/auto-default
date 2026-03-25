@@ -84,6 +84,13 @@
 //! If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
 //! will **not** be added
 //!
+//! # `#[auto_default(Option)]`
+//!
+//! By default, a default field value will be added to every field without one.
+//!
+//! If `#[auto_default(Option)]` is used, a default field value will be added only to fields
+//! that are `Option<T>`.
+//!
 //! # Global Import
 //!
 //! This will make `#[auto_default]` globally accessible in your entire crate, without needing to import it:
@@ -169,12 +176,24 @@ use proc_macro::TokenTree;
 pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut compile_errors = TokenStream::new();
 
-    if !args.is_empty() {
-        compile_errors.extend(create_compile_error!(
-            args.into_iter().next(),
-            "no arguments expected",
-        ));
-    }
+    let mut args = args.into_iter();
+
+    // If `#[auto_default(Option)]` is specified, only add a default field value to
+    // fields that are of the type `Option<T>`
+    let is_only_option = match args.next() {
+        Some(TokenTree::Ident(ident)) if ident.to_string() == "Option" => {
+            if let Some(tt) = args.next() {
+                compile_errors.extend(CompileError::new(tt.span(), "unexpected token"));
+            }
+            true
+        }
+        Some(tt) => {
+            compile_errors.extend(CompileError::new(tt.span(), "unexpected token"));
+            return compile_errors;
+        }
+        None => false,
+    };
+    let is_only_option = IsOnlyOption(is_only_option);
 
     // Input supplied by the user. All tokens from here will
     // get sent back to `output`
@@ -253,6 +272,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                 &mut compile_errors,
                 // none of the fields are considered to be skipped initially
                 IsSkip(false),
+                is_only_option,
             )]);
         }
         ItemKind::Enum => {
@@ -313,6 +333,7 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
                             named_variant_fields,
                             &mut compile_errors,
                             is_skip,
+                            is_only_option,
                         )]);
 
                         stream_enum_variant_discriminant_and_comma(
@@ -368,6 +389,9 @@ pub fn auto_default(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 struct IsSkip(bool);
+/// If `#[auto_default(Option)]` is specified
+#[derive(Copy, Clone)]
+struct IsOnlyOption(bool);
 struct IsSkipAllowed(bool);
 
 /// Streams enum variant discriminant + comma at the end from `source` into `sink`
@@ -608,7 +632,9 @@ enum ItemKind {
     Enum,
 }
 
-/// `fields` is [`StructFields`] in the grammar.
+/// `fields` is [`StructFields`] in Rust's grammar.
+///
+/// [`StructFields`]: https://doc.rust-lang.org/reference/items/structs.html#grammar-StructFields
 ///
 /// It is the curly braces, and everything within, for a struct with named fields,
 /// or an enum variant with named fields.
@@ -619,11 +645,19 @@ enum ItemKind {
 /// If a field is marked with `#[auto_default(skip)]`, no default value will be
 /// added
 ///
-/// [`StructFields`]: https://doc.rust-lang.org/reference/items/structs.html#grammar-StructFields
+/// # `#[auto_default(Option)]`
+///
+/// If `is_only_option` is true, then no default value will be added,
+/// unless:
+///
+/// - Last segment of the field's type's path is `Option`
+/// - The field's type is generic (has `<` and `>`)
+/// - The field's type has only 1 generic type parameter
 fn add_default_field_values(
     fields: Group,
     compile_errors: &mut TokenStream,
     is_skip_variant: IsSkip,
+    is_only_option: IsOnlyOption,
 ) -> Group {
     // All the tokens corresponding to the struct's field, passed by the user
     // These tokens will eventually all be sent to `output_fields`,
@@ -644,11 +678,30 @@ fn add_default_field_values(
             compile_errors,
             IsSkipAllowed(true),
         );
+
+        // If #[auto_default(skip)] is present
         let is_skip = is_skip_field.0 || is_skip_variant.0;
+
+        // If this is `true`, no default field value will be added
+        //
+        // mut: This is set to `true` if `is_only_option` is true and
+        // we discover that this field is of type `Option<T>`
+        //
+        // We start out by considering every field as skipped if it isn't in an
+        // Option. Only if we confirm it to be in an Option, do we add a default field value
+        let mut add_default_field_value = if is_only_option.0 { false } else { !is_skip };
 
         // pub field: Type
         // ^^^
         stream_vis(&mut input_fields, &mut output_fields);
+
+        // If the type path ends in an `Option`.
+        //
+        // ```txt
+        // ::core::option::Option
+        //                 ^^^^^^
+        // ```
+        let mut is_potentially_option = false;
 
         // pub field: Type
         //     ^^^^^
@@ -668,34 +721,55 @@ fn add_default_field_values(
         // - Adding default value of `= Default::default()` if one is not present
         // - Continue to next iteration of the loop
         loop {
+            let mut validate_attr = || {
+                // Only error if the skip was REDUNDANT.
+                //
+                // Option-only mode is on, but this isn't an option.
+                if is_only_option.0 && !is_potentially_option && is_skip_field.0 {
+                    compile_errors.extend(CompileError::new(
+                            field_ident_span,
+                            "this field is marked `#[auto_default(skip)]`, which does nothing since this item is marked `#[auto_default(Option)]` and this field doesn't appear to be an `Option<T>`"
+                        ));
+                }
+                // The variant/struct itself was already skipped.
+                else if is_skip_variant.0 && is_skip_field.0 {
+                    compile_errors.extend(CompileError::new(
+                            field_ident_span,
+                            "this field is marked `#[auto_default(skip)]`, which is redundant because the entire variant/struct is already skipped"
+                        ));
+                }
+            };
             match input_fields.peek() {
                 // This field has a custom default field value
                 //
                 // field: Type = default
                 //             ^
                 Some(TokenTree::Punct(p)) if p.as_char() == '=' => {
-                    if is_skip {
+                    if is_skip_field.0 {
                         compile_errors.extend(CompileError::new(
-                            field_ident_span,
-                            concat!(
-                                "this field is marked `#[auto_default(skip)]`,",
-                                " which does nothing since this field has a",
-                                " default value: `= ...`\n",
-                                "the attribute `#[auto_default(skip)]` can be removed"
-                            ),
-                        ));
+                                field_ident_span,
+                                "this field is marked `#[auto_default(skip)]`, which does nothing since this field has a default value: `= ...`"
+                            ));
                     }
 
+                    // Take all tokens representing the default field value from
+                    // `input_fields` and move them into `output_fields`
                     loop {
                         match input_fields.next() {
+                            // Comma after field. Field is finished.
                             Some(TokenTree::Punct(p)) if p == ',' => {
                                 output_fields.extend([p]);
-                                // Comma after field. Field is finished.
                                 continue 'parse_field;
                             }
+                            // This token is part of the field's default value
+                            //
+                            // foo = Some(42)
+                            //       ^^^^
                             Some(tt) => output_fields.extend([tt]),
                             // End of input. Field is finished. This is the last field
-                            None => break 'parse_field,
+                            None => {
+                                break 'parse_field;
+                            }
                         }
                     }
                 }
@@ -803,11 +877,15 @@ fn add_default_field_values(
                     // Now that we're here, we can be 100% sure that the `comma` we have
                     // is at the END of the field
 
+                    if is_skip && !add_default_field_value {
+                        validate_attr();
+                    }
+
                     // Insert default value before the comma
                     //
                     // field: Type = Default::default(),
                     //             ^^^^^^^^^^^^^^^^^^^^
-                    if !is_skip {
+                    if add_default_field_value {
                         output_fields.extend(default(field_ident_span));
                     }
 
@@ -827,6 +905,129 @@ fn add_default_field_values(
                 }
                 // This token is part of the field's type
                 //
+                // field: some::Option
+                //              ^^^^^^
+                Some(TokenTree::Ident(ident))
+                    if is_only_option.0
+                        && ident.to_string() == "Option"
+                        && !is_potentially_option =>
+                {
+                    is_potentially_option = true;
+                    output_fields.extend(input_fields.next())
+                }
+                // This isn't actually an Option.
+                //
+                // field: some::Option::Type
+                //                      ^^^^
+                Some(TokenTree::Ident(ident)) if is_only_option.0 && is_potentially_option => {
+                    is_potentially_option = false;
+                    output_fields.extend(input_fields.next())
+                }
+                // This token is part of the field's type
+                //
+                // field: some::Option<
+                //                    ^
+                Some(TokenTree::Punct(punct))
+                    if is_only_option.0 && punct.as_char() == '<' && is_potentially_option =>
+                {
+                    output_fields.extend(input_fields.next());
+
+                    // The nesting level of angle brackets that we are currently in
+                    //
+                    //     Option<HashMap<u32, u32>, String>
+                    //        ^ 0
+                    //              ^ 1
+                    //                      ^ 2
+                    //                            ^ 1
+                    //                                ^ 1
+                    //                                      ^ 1
+                    //
+                    //
+                    // INVARIANT: We assume that the input TokenStream contains a balanced amount of
+                    // '<' and '>', as is the case for rust's types (when not descending into nested TokenStreams
+                    // e.g. `foo::<{ 1 < 2 }>`). only has the top level tokens `foo`, `:`, `:`, `<`, `{...}`, `>`, which
+                    // has a balanced amount of angle brackets.
+                    let mut nesting_level = 1;
+
+                    // If we've seen a ',' token at the top-level
+                    //
+                    // Option<T,>
+                    //         ^ true
+                    //
+                    // First comma in the flat list of tokens is not at the top-level:
+                    //
+                    // Option<HashMap<u32, u32>, String>
+                    //                   ^ false
+                    //                         ^ true
+                    let mut seen_comma_at_top_level = false;
+
+                    // If the top-level generics has a 2nd type parameter
+                    //
+                    // false:
+                    //
+                    //     Option<T,>
+                    //
+                    // false:
+                    //
+                    //     Option<HashMap<u32, u32>>
+                    //
+                    // true:
+                    //
+                    //     Option<u32, u8>
+                    //
+                    // Can only be `true` if `seen_comma_at_the_top_level` is true.
+                    let mut has_second_type_parameter_at_top_level = false;
+
+                    loop {
+                        let is_top_level = nesting_level == 1;
+
+                        match input_fields.peek() {
+                            Some(TokenTree::Punct(p)) if p.as_char() == '<' => {
+                                nesting_level += 1;
+                                output_fields.extend(input_fields.next());
+                            }
+                            Some(TokenTree::Punct(p)) if p.as_char() == '>' => {
+                                if is_top_level {
+                                    output_fields.extend(input_fields.next());
+                                    // Closing the generic type of the Option.
+                                    break;
+                                } else {
+                                    nesting_level -= 1;
+                                    output_fields.extend(input_fields.next());
+                                }
+                            }
+                            Some(TokenTree::Punct(p)) if p.as_char() == ',' && is_top_level => {
+                                seen_comma_at_top_level = true;
+                                output_fields.extend(input_fields.next());
+                            }
+                            // type parameter or identifier following a comma at top level
+                            Some(_) if seen_comma_at_top_level && is_top_level => {
+                                has_second_type_parameter_at_top_level = true;
+                                output_fields.extend(input_fields.next());
+                            }
+                            // any other token (ident, literal, punct that isn't <, >, or top-level ,)
+                            Some(_) => {
+                                output_fields.extend(input_fields.next());
+                            }
+                            None => break,
+                        }
+                    }
+
+                    // if the type looks something like `Option<T>`
+                    let is_option = !has_second_type_parameter_at_top_level;
+
+                    if is_option {
+                        // it is likely a standard Option<T>.
+                        //
+                        // Only skip if #[auto_default(skip)] was applied.
+                        add_default_field_value = !is_skip;
+                    } else {
+                        // We skip this, because it is NOT an option
+                        add_default_field_value = false;
+                    }
+                }
+                // This token is part of the field's type
+                //
                 // field: some::Type
                 //              ^^^^
                 Some(_) => output_fields.extend(input_fields.next()),
@@ -838,7 +1039,8 @@ fn add_default_field_values(
                 //                ^
                 // }
                 None => {
-                    if !is_skip {
+                    if add_default_field_value {
+                        validate_attr();
                         output_fields.extend(default(field_ident_span));
                     }
                     // No more fields

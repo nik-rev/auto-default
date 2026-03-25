@@ -79,6 +79,13 @@ You can apply the [`#[auto_default]`](https://docs.rs/auto-default/latest/auto_d
 If any field or variant has the `#[auto_default(skip)]` attribute, a default field value of `Default::default()`
 will **not** be added
 
+## `#[auto_default(Option)]`
+
+By default, a default field value will be added to every field without one.
+
+If `#[auto_default(Option)]` is used, a default field value will be added only to fields
+that are `Option<T>`.
+
 ## Global Import
 
 This will make `#[auto_default]` globally accessible in your entire crate, without needing to import it:

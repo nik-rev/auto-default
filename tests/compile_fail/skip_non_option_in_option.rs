@@ -1,12 +1,14 @@
 #![feature(default_field_values)]
 #![feature(const_trait_impl)]
 #![feature(const_default)]
+
 use auto_default::auto_default;
 
-#[allow(unused)]
-#[auto_default]
-#[derive(PartialEq, Eq, Debug)]
-enum Z {
+#[auto_default(Option)]
+#[derive(PartialEq, Debug)]
+struct X {
     #[auto_default(skip)]
-    A { field: (), not_skip: () },
+    not_option: u32,
 }
+
+fn main() {}

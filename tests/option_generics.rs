@@ -1,0 +1,18 @@
+#![feature(default_field_values)]
+#![feature(const_trait_impl)]
+#![feature(const_default)]
+
+use std::collections::HashMap;
+
+use auto_default::auto_default;
+
+#[auto_default(Option)]
+#[derive(PartialEq, Debug)]
+struct X<'a> {
+    default: Option<HashMap<&'a str, u8>>,
+}
+
+#[test]
+fn test() {
+    assert_eq!(X { .. }, X { default: None });
+}

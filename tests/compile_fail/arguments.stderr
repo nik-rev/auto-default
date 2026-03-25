@@ -1,4 +1,4 @@
-error: no arguments expected
+error: unexpected token
  --> tests/compile_fail/arguments.rs:4:16
   |
 4 | #[auto_default(arguments)]

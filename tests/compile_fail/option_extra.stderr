@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/compile_fail/option_extra.rs:9:23
+  |
+9 | #[auto_default(Option extra)]
+  |                       ^^^^^

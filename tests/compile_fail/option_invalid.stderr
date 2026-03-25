@@ -1,0 +1,5 @@
+error: unexpected token
+ --> tests/compile_fail/option_invalid.rs:9:16
+  |
+9 | #[auto_default(invalid)]
+  |                ^^^^^^^

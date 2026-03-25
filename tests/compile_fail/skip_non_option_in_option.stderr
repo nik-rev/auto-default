@@ -1,0 +1,5 @@
+error: this field is marked `#[auto_default(skip)]`, which does nothing since this item is marked `#[auto_default(Option)]` and this field doesn't appear to be an `Option<T>`
+  --> tests/compile_fail/skip_non_option_in_option.rs:11:5
+   |
+11 |     not_option: u32,
+   |     ^^^^^^^^^^

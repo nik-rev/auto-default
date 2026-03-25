@@ -1,0 +1,5 @@
+error: missing field `fake_option` in initializer
+  --> tests/compile_fail/fake_option.rs:18:9
+   |
+18 |     X { .. };
+   |         ^ fields that do not have a defaulted value must be provided explicitly

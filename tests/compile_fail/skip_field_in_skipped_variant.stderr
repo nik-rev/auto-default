@@ -1,0 +1,5 @@
+error: this field is marked `#[auto_default(skip)]`, which is redundant because the entire variant/struct is already skipped
+  --> tests/compile_fail/skip_field_in_skipped_variant.rs:15:9
+   |
+15 |         field: (),
+   |         ^^^^^
